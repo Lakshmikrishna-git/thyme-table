@@ -20,7 +20,8 @@ public class WebServer {
     private static final Map<String, User> sessions = new ConcurrentHashMap<>();
 
     public static void main(String[] args) throws Exception {
-        try (Connection ignored = DatabaseConnection.getConnection()) { }
+        try (Connection ignored = DatabaseConnection.getConnection()) {
+        }
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
         server.createContext("/", WebServer::handle);
         server.setExecutor(Executors.newCachedThreadPool());
@@ -38,28 +39,107 @@ public class WebServer {
                 try {
                     switch (action) {
                         case "login" -> {
-                            User found = auth.login(form.getOrDefault("username", ""), form.getOrDefault("password", ""));
-                            if (found == null) message = "Username or password is incorrect.";
-                            else { createSession(ex, found); message = "Welcome back, " + found.getUsername() + "!"; }
+                            User found = auth.login(form.getOrDefault("username", ""),
+                                    form.getOrDefault("password", ""));
+                            if (found == null)
+                                message = "Username or password is incorrect.";
+                            else {
+                                createSession(ex, found);
+                                message = "Welcome back, " + found.getUsername() + "!";
+                            }
                         }
                         case "register" -> {
-                            message = auth.register(form.get("username"), form.get("password"), form.getOrDefault("role", "USER"));
-                            if (message.isEmpty()) { User found = auth.login(form.get("username"), form.get("password")); createSession(ex, found); message = "Account created successfully."; }
+                            message = auth.register(form.get("username"), form.get("password"),
+                                    form.getOrDefault("role", "USER"));
+                            if (message.isEmpty()) {
+                                User found = auth.login(form.get("username"), form.get("password"));
+                                createSession(ex, found);
+                                message = "Account created successfully.";
+                            }
                         }
-                        case "logout" -> { String token = cookie(ex, "TTSESSION"); if (token != null) sessions.remove(token); ex.getResponseHeaders().add("Set-Cookie", "TTSESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"); message = "You have signed out."; }
-                        case "addPantry" -> { require(user); message = pantry.save(user, form.get("name"), Double.parseDouble(form.getOrDefault("quantity", "0")), form.getOrDefault("unit", "g"), form.get("expiry")); if (message.isEmpty()) message = "Pantry item saved."; }
-                        case "deletePantry" -> { require(user); pantry.delete(user, Integer.parseInt(form.get("id"))); message = "Pantry item deleted."; }
-                        case "review" -> { require(user); message = recipes.review(user, Integer.parseInt(form.get("recipeId")), Integer.parseInt(form.get("rating")), form.getOrDefault("reviewText", "")); if (message.isEmpty()) message = "Your rating has been saved."; }
-                        case "addRecipe" -> { require(user); message = recipes.add(user, form.get("title"), form.get("description"), form.get("instructions"), form.getOrDefault("category", "Other"), form.getOrDefault("tags", ""), form.getOrDefault("ingredients", "")); if (message.isEmpty()) message = "Recipe published successfully."; }
-                        case "updateRecipe" -> { require(user); message = recipes.update(user, Integer.parseInt(form.get("id")), form.get("title"), form.get("description"), form.get("instructions"), form.getOrDefault("category", "Other"), form.getOrDefault("tags", ""), form.getOrDefault("ingredients", "")); if (message.isEmpty()) message = "Recipe updated successfully."; }
-                        case "deleteRecipe" -> { require(user); message = recipes.delete(user, Integer.parseInt(form.get("id"))); if (message.isEmpty()) message = "Recipe deleted."; }
-                        case "addMeal" -> { require(user); message = meals.add(user, Integer.parseInt(form.get("recipeId")), form.get("date"), form.get("mealType")); if (message.isEmpty()) message = "Meal added to your plan."; }
-                        case "deleteMeal" -> { require(user); meals.delete(user, Integer.parseInt(form.get("id"))); message = "Meal removed."; }
-                        case "moderateUser" -> { require(user); if (!user.isAdmin()) throw new SecurityException("Admin access required."); try (Connection c = DatabaseConnection.getConnection(); PreparedStatement p = c.prepareStatement("DELETE FROM users WHERE id=? AND username<>'admin'")) { p.setInt(1, Integer.parseInt(form.get("id"))); p.executeUpdate(); } message = "Account removed if it existed."; }
-                        default -> { }
+                        case "logout" -> {
+                            String token = cookie(ex, "TTSESSION");
+                            if (token != null)
+                                sessions.remove(token);
+                            ex.getResponseHeaders().add("Set-Cookie",
+                                    "TTSESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
+                            message = "You have signed out.";
+                        }
+                        case "addPantry" -> {
+                            require(user);
+                            message = pantry.save(user, form.get("name"),
+                                    Double.parseDouble(form.getOrDefault("quantity", "0")),
+                                    form.getOrDefault("unit", "g"), form.get("expiry"));
+                            if (message.isEmpty())
+                                message = "Pantry item saved.";
+                        }
+                        case "deletePantry" -> {
+                            require(user);
+                            pantry.delete(user, Integer.parseInt(form.get("id")));
+                            message = "Pantry item deleted.";
+                        }
+                        case "review" -> {
+                            require(user);
+                            message = recipes.review(user, Integer.parseInt(form.get("recipeId")),
+                                    Integer.parseInt(form.get("rating")), form.getOrDefault("reviewText", ""));
+                            if (message.isEmpty())
+                                message = "Your rating has been saved.";
+                        }
+                        case "addRecipe" -> {
+                            require(user);
+                            message = recipes.add(user, form.get("title"), form.get("description"),
+                                    form.get("instructions"), form.getOrDefault("category", "Other"),
+                                    form.getOrDefault("tags", ""), form.getOrDefault("ingredients", ""));
+                            if (message.isEmpty())
+                                message = "Recipe published successfully.";
+                        }
+                        case "updateRecipe" -> {
+                            require(user);
+                            message = recipes.update(user, Integer.parseInt(form.get("id")), form.get("title"),
+                                    form.get("description"), form.get("instructions"),
+                                    form.getOrDefault("category", "Other"), form.getOrDefault("tags", ""),
+                                    form.getOrDefault("ingredients", ""));
+                            if (message.isEmpty())
+                                message = "Recipe updated successfully.";
+                        }
+                        case "deleteRecipe" -> {
+                            require(user);
+                            message = recipes.delete(user, Integer.parseInt(form.get("id")));
+                            if (message.isEmpty())
+                                message = "Recipe deleted.";
+                        }
+                        case "addMeal" -> {
+                            require(user);
+                            message = meals.add(user, Integer.parseInt(form.get("recipeId")), form.get("date"),
+                                    form.get("mealType"));
+                            if (message.isEmpty())
+                                message = "Meal added to your plan.";
+                        }
+                        case "deleteMeal" -> {
+                            require(user);
+                            meals.delete(user, Integer.parseInt(form.get("id")));
+                            message = "Meal removed.";
+                        }
+                        case "moderateUser" -> {
+                            require(user);
+                            if (!user.isAdmin())
+                                throw new SecurityException("Admin access required.");
+                            try (Connection c = DatabaseConnection.getConnection();
+                                    PreparedStatement p = c
+                                            .prepareStatement("DELETE FROM users WHERE id=? AND username<>'admin'")) {
+                                p.setInt(1, Integer.parseInt(form.get("id")));
+                                p.executeUpdate();
+                            }
+                            message = "Account removed if it existed.";
+                        }
+                        default -> {
+                        }
                     }
-                } catch (SecurityException e) { message = e.getMessage(); }
-                catch (Exception e) { message = e.getMessage() == null ? "Something went wrong. Please check the form." : e.getMessage(); }
+                } catch (SecurityException e) {
+                    message = e.getMessage();
+                } catch (Exception e) {
+                    message = e.getMessage() == null ? "Something went wrong. Please check the form." : e.getMessage();
+                }
             }
             user = current(ex);
             send(ex, 200, render(user, message, ex.getRequestURI()));
@@ -74,59 +154,450 @@ public class WebServer {
         ex.getResponseHeaders().add("Set-Cookie", "TTSESSION=" + token + "; Path=/; HttpOnly; SameSite=Lax");
         ex.getResponseHeaders().add("Refresh", "0; url=/?page=home");
     }
-    private static User current(HttpExchange ex) { String token = cookie(ex, "TTSESSION"); return token == null ? null : sessions.get(token); }
-    private static String cookie(HttpExchange ex, String name) { String h = ex.getRequestHeaders().getFirst("Cookie"); if (h == null) return null; for (String part : h.split(";")) { String[] p = part.trim().split("=", 2); if (p.length == 2 && p[0].equals(name)) return p[1]; } return null; }
+
+    private static User current(HttpExchange ex) {
+        String token = cookie(ex, "TTSESSION");
+        return token == null ? null : sessions.get(token);
+    }
+
+    private static String cookie(HttpExchange ex, String name) {
+        String h = ex.getRequestHeaders().getFirst("Cookie");
+        if (h == null)
+            return null;
+        for (String part : h.split(";")) {
+            String[] p = part.trim().split("=", 2);
+            if (p.length == 2 && p[0].equals(name))
+                return p[1];
+        }
+        return null;
+    }
+
     private static Map<String, String> parse(HttpExchange ex) throws IOException {
-        Map<String, String> map = new HashMap<>(); String data = "POST".equalsIgnoreCase(ex.getRequestMethod()) ? new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8) : ex.getRequestURI().getRawQuery();
-        if (data != null) for (String pair : data.split("&")) { String[] p = pair.split("=", 2); map.put(URLDecoder.decode(p[0], StandardCharsets.UTF_8), p.length > 1 ? URLDecoder.decode(p[1], StandardCharsets.UTF_8) : ""); }
+        Map<String, String> map = new HashMap<>();
+        String data = "POST".equalsIgnoreCase(ex.getRequestMethod())
+                ? new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)
+                : ex.getRequestURI().getRawQuery();
+        if (data != null)
+            for (String pair : data.split("&")) {
+                String[] p = pair.split("=", 2);
+                map.put(URLDecoder.decode(p[0], StandardCharsets.UTF_8),
+                        p.length > 1 ? URLDecoder.decode(p[1], StandardCharsets.UTF_8) : "");
+            }
         return map;
     }
-    private static void require(User u) { if (u == null) throw new SecurityException("Please sign in to use this feature."); }
+
+    private static void require(User u) {
+        if (u == null)
+            throw new SecurityException("Please sign in to use this feature.");
+    }
 
     private static String render(User user, String message, URI uri) throws Exception {
-        Map<String,String> q = parseQuery(uri); String page=q.getOrDefault("page","home"), search=q.getOrDefault("q",""), tag=q.getOrDefault("tag","");
-        StringBuilder b=new StringBuilder("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Thyme & Table</title><style>").append(CSS).append("</style></head><body>");
-        b.append("<header class='top'><a class='brand' href='/?page=home'><span class='logo'>✿</span><span>thyme <i>&</i> table<small>GOOD FOOD, LESS WASTE</small></span></a><nav><a href='/?page=home'>Home</a><a href='/?page=recipes'>Recipes</a><a href='/?page=influencers'>Influencers</a>");
-        if(user!=null)b.append("<a href='/?page=pantry'>My Pantry</a><a href='/?page=planner'>Meal Planner</a>"); if(user!=null&&user.isAdmin())b.append("<a href='/?page=admin'>Admin</a>");
-        b.append("</nav><div class='account'>"); if(user==null)b.append("<a class='btn small' href='/?page=login'>Sign in</a>"); else b.append("<span class='hello'>Hi, ").append(esc(user.getUsername())).append(" · ").append(esc(user.getRole())).append("</span><form method='post' class='inline'><input type='hidden' name='action' value='logout'><button class='linkbtn'>Sign out</button></form>");
-        b.append("</div></header><main>"); if(!message.isBlank())b.append("<div class='notice'>").append(esc(message)).append("</div>");
-        switch(page) {
-            case "login", "register" -> { if(user!=null)b.append("<section class='card'><h1>You're signed in</h1><a class='btn' href='/?page=home'>Go to home</a></section>"); else renderAuth(b,page); }
-            case "pantry" -> renderPantry(b,user);
+        Map<String, String> q = parseQuery(uri);
+        String page = q.getOrDefault("page", "home"), search = q.getOrDefault("q", ""), tag = q.getOrDefault("tag", "");
+        StringBuilder b = new StringBuilder(
+                "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Thyme & Table</title><style>")
+                .append(CSS).append("</style></head><body>");
+        b.append(
+                "<header class='top'><a class='brand' href='/?page=home'><span class='logo'>✿</span><span>thyme <i>&</i> table<small>GOOD FOOD, LESS WASTE</small></span></a><nav><a href='/?page=home'>Home</a><a href='/?page=recipes'>Recipes</a><a href='/?page=influencers'>Influencers</a>");
+        if (user != null)
+            b.append("<a href='/?page=pantry'>My Pantry</a><a href='/?page=planner'>Meal Planner</a>");
+        if (user != null && user.isAdmin())
+            b.append("<a href='/?page=admin'>Admin</a>");
+        b.append("</nav><div class='account'>");
+        if (user == null)
+            b.append("<a class='btn small' href='/?page=login'>Sign in</a>");
+        else
+            b.append("<span class='hello'>Hi, ").append(esc(user.getUsername())).append(" · ")
+                    .append(esc(user.getRole()))
+                    .append("</span><form method='post' class='inline'><input type='hidden' name='action' value='logout'><button class='linkbtn'>Sign out</button></form>");
+        b.append("</div></header><main>");
+        if (!message.isBlank())
+            b.append("<div class='notice'>").append(esc(message)).append("</div>");
+        switch (page) {
+            case "login", "register" -> {
+                if (user != null)
+                    b.append(
+                            "<section class='card'><h1>You're signed in</h1><a class='btn' href='/?page=home'>Go to home</a></section>");
+                else
+                    renderAuth(b, page);
+            }
+            case "pantry" -> renderPantry(b, user);
             case "influencers" -> renderInfluencers(b);
-            case "creator" -> renderCreator(b,q,user);
-            case "recipe" -> renderRecipe(b,user,Integer.parseInt(q.getOrDefault("id","0")));
-            case "recipes" -> renderRecipes(b,user,search,tag);
-            case "planner" -> renderPlanner(b,user);
-            case "newrecipe" -> renderNewRecipe(b,user);
-            case "editrecipe" -> renderEditRecipe(b,user,q);
-            case "admin" -> renderAdmin(b,user);
-            default -> renderHome(b,user);
+            case "creator" -> renderCreator(b, q, user);
+            case "recipe" -> renderRecipe(b, user, Integer.parseInt(q.getOrDefault("id", "0")));
+            case "recipes" -> renderRecipes(b, user, search, tag);
+            case "planner" -> renderPlanner(b, user);
+            case "newrecipe" -> renderNewRecipe(b, user);
+            case "editrecipe" -> renderEditRecipe(b, user, q);
+            case "admin" -> renderAdmin(b, user);
+            default -> renderHome(b, user);
         }
-        if(user!=null&&(user.isInfluencer()||user.isAdmin())&&!page.equals("newrecipe"))b.append("<a class='fab' href='/?page=newrecipe'>＋ Publish recipe</a>");
-        b.append("</main><footer><a class='brand' href='/?page=home'>✿ thyme <i>&</i> table</a><p>Thoughtful cooking. Happier kitchens.</p><small>College project · Java + JDBC + SQLite</small></footer></body></html>"); return b.toString();
+        if (user != null && (user.isInfluencer() || user.isAdmin()) && !page.equals("newrecipe"))
+            b.append("<a class='fab' href='/?page=newrecipe'>＋ Publish recipe</a>");
+        b.append(
+                "</main><footer><a class='brand' href='/?page=home'>✿ thyme <i>&</i> table</a><p>Thoughtful cooking. Happier kitchens.</p><small>College project · Java + JDBC + SQLite</small></footer></body></html>");
+        return b.toString();
     }
-    private static void renderAuth(StringBuilder b,String page){boolean login=page.equals("login");b.append("<section class='auth card'><div class='eyebrow'>YOUR KITCHEN, ORGANIZED</div><h1>").append(login?"Welcome back":"Create your account").append("</h1><p class='muted'>Discover recipes, plan meals and make the most of every ingredient.</p><form method='post' class='stack'><input type='hidden' name='action' value='").append(login?"login":"register").append("'><label>Username<input name='username' minlength='3' maxlength='24' required autocomplete='username'></label><label>Password<input type='password' name='password' minlength='8' required autocomplete='current-password'></label>");if(!login)b.append("<label>Account type<select name='role'><option value='USER'>Regular user</option><option value='INFLUENCER'>Influencer / food creator</option></select></label>");b.append("<button class='btn'>").append(login?"Sign in":"Create account").append("</button></form><p>").append(login?"New here? <a href='/?page=register'>Create an account</a>":"Already registered? <a href='/?page=login'>Sign in</a>").append("</p><p class='muted tiny'>Demo: admin / Admin@12345 · maya / Maya@12345 · demo / Demo@12345</p></section>");}
-    private static void renderHome(StringBuilder b,User u)throws Exception{b.append("<section class='hero'><div class='herotext'><div class='eyebrow'>A FRESH TAKE ON HOME COOKING</div><h1>Make something<br><em>delicious today.</em></h1><p>Plan smarter, use what you have, and find your next favourite recipe.</p><form action='/' class='search'><input type='hidden' name='page' value='recipes'><input name='q' placeholder='Search recipes or ingredients...'><button class='btn'>Find recipes ↗</button></form><div class='herofoot'><span>✦ Less food waste</span><span>✦ Everyday inspiration</span><span>✦ Your kitchen, your way</span></div></div><div class='heroart'><div class='circle'></div><div class='foodbig'>🥑</div><div class='floatcard one'>✿ <span>fresh ideas</span></div><div class='floatcard two'>♡ <span>made at home</span></div></div></section>");if(u!=null){b.append("<section class='section'><div class='sectionhead'><div><div class='eyebrow'>BASED ON YOUR PANTRY</div><h2>Recommended for you</h2><p class='muted'>50% pantry match · 20% community rating · 30% creator score</p></div><a href='/?page=recipes'>Browse all →</a></div><div class='grid cards'>");List<Recipe> rec=recipes.recommendations(u);for(int i=0;i<Math.min(3,rec.size());i++){Recipe r=rec.get(i);b.append(recipeCard(r,u)).append(recommendationNote(r,u));}if(rec.isEmpty())b.append(empty("No recommendations yet","Add pantry ingredients to get matched recipes."));b.append("</div></section>");}b.append("<section class='section'><div class='sectionhead'><div><div class='eyebrow'>A LITTLE INSPIRATION</div><h2>Recipes to fall for</h2></div><a href='/?page=recipes'>See all recipes →</a></div><div class='grid cards'>");for(Recipe r:recipes.list("","").stream().limit(4).toList())b.append(recipeCard(r,u));b.append("</div></section><section class='banner'><div><div class='eyebrow'>MEET YOUR NEXT FOOD FAVOURITE</div><h2>Good things are growing.</h2><p>Find creators, learn their tricks and cook something lovely.</p></div><a class='btn' href='/?page=influencers'>Discover influencers →</a></section>");}
-    private static void renderRecipes(StringBuilder b,User u,String search,String tag)throws Exception{b.append("<section class='pagehead'><div><div class='eyebrow'>YOUR NEXT FAVOURITE</div><h1>Recipe book</h1><p>Search by recipe name or ingredient, then explore by tag.</p></div></section><form class='search' action='/'><input type='hidden' name='page' value='recipes'><input name='q' value='").append(esc(search)).append("' placeholder='Recipe name or ingredient'><select name='tag'><option value=''>All tags</option>");for(String t:List.of("Healthy","Budget-Friendly","Quick Meals","Vegetarian"))b.append("<option ").append(t.equals(tag)?"selected":"").append(">").append(t).append("</option>");b.append("</select><button class='btn'>Search</button></form><div class='grid cards section'>");List<Recipe> all=recipes.list(search,tag);if(all.isEmpty())b.append(empty("No recipes found","Try another name, ingredient or tag."));for(Recipe r:all)b.append(recipeCard(r,u));b.append("</div>");}
-    private static String recipeCard(Recipe r,User u){String emoji=r.getCategory().toLowerCase().contains("healthy")?"🥗":r.getCategory().toLowerCase().contains("budget")?"🥔":r.getCategory().toLowerCase().contains("quick")?"🍝":"🍲";return "<article class='card recipe-card'><a class='foodthumb' href='/?page=recipe&id="+r.getId()+"'><span>"+emoji+"</span><small>"+esc(r.getCategory())+"</small></a><div class='recipebody'><div class='tags'>"+tags(r.getTags())+"</div><h3><a href='/?page=recipe&id="+r.getId()+"'>"+esc(r.getTitle())+"</a></h3><p class='muted tiny'>By "+esc(r.getCreator())+"</p><div class='cardfoot'><span class='rating'>"+(r.getAverageRating()==null?"Not rated yet":"★ "+String.format(Locale.US,"%.1f",r.getAverageRating())+" / 5")+"</span><a class='arrow' href='/?page=recipe&id="+r.getId()+"'>↗</a></div></div></article>";}
-    private static void renderPantry(StringBuilder b,User u)throws Exception{if(u==null){b.append(loginPrompt());return;}b.append("<section class='pagehead'><div><div class='eyebrow'>YOUR KITCHEN INVENTORY</div><h1>My pantry</h1><p>Know what you have. Waste less. Cook more.</p></div></section><div class='grid two'><section class='card'><h2>Add or update an item</h2><form method='post' class='stack'><input type='hidden' name='action' value='addPantry'><label>Ingredient name<input name='name' placeholder='e.g. Tomatoes' required maxlength='80'></label><div class='grid two'><label>Quantity<input type='number' name='quantity' min='0' step='.1' required></label><label>Unit<select name='unit'><option>g</option><option>kg</option><option>ml</option><option>l</option><option>unit</option><option>tbsp</option><option>tsp</option></select></label></div><label>Expiry date (optional)<input type='date' name='expiry'></label><button class='btn'>Save pantry item</button><p class='tiny muted'>Saving an existing ingredient updates its quantity.</p></form></section><section class='card'><h2>What you have</h2>");List<PantryItem> items=pantry.list(u);if(items.isEmpty())b.append(empty("Your pantry is empty","Add your first ingredient to start matching recipes."));else for(PantryItem x:items)b.append("<div class='pantryrow'><div><b>").append(esc(x.getName())).append("</b><small>").append(fmt(x.getQuantity())).append(" ").append(esc(x.getUnit())).append(x.getExpiryDate().isBlank()?"":" · Best before "+esc(x.getExpiryDate())).append("</small></div><form method='post'><input type='hidden' name='action' value='deletePantry'><input type='hidden' name='id' value='").append(x.getId()).append("'><button class='iconbtn' title='Delete item'>×</button></form></div>");b.append("</section></div>");}
-    private static void renderInfluencers(StringBuilder b)throws Exception{b.append("<section class='pagehead'><div><div class='eyebrow'>MEET THE CREATORS</div><h1>Inspiration from real kitchens</h1><p>Discover food creators and the recipes they love to share.</p></div></section><div class='grid cards'>");for(String[] x:recipes.influencers())b.append("<article class='card creator'><div class='avatar'>").append(esc(x[1].substring(0,1).toUpperCase())).append("</div><div class='eyebrow'>").append(esc(x[3])).append("</div><h2>").append(esc(x[1])).append("</h2><p>").append(esc(x[2])).append("</p><div class='muted tiny'>").append(x[4]).append(" recipes · ").append(x[5]==null?"No ratings yet":"★ "+String.format(Locale.US,"%.1f",Double.parseDouble(x[5]))).append("</div><a class='btn secondary' href='/?page=creator&id=").append(x[0]).append("'>View profile</a></article>");b.append("</div>");}
-    private static void renderCreator(StringBuilder b,Map<String,String> q,User u)throws Exception{int id=Integer.parseInt(q.getOrDefault("id","0"));String[] chosen=null;for(String[] x:recipes.influencers())if(Integer.parseInt(x[0])==id)chosen=x;if(chosen==null){b.append(empty("Creator not found","Browse all influencers to find a profile."));return;}b.append("<section class='pagehead'><div class='avatar large'>").append(esc(chosen[1].substring(0,1).toUpperCase())).append("</div><div><div class='eyebrow'>FOOD CREATOR</div><h1>").append(esc(chosen[1])).append("</h1><p>").append(esc(chosen[2])).append("</p><span class='pill'>").append(esc(chosen[3])).append("</span></div></section><h2>Recipes by ").append(esc(chosen[1])).append("</h2><div class='grid cards'>");for(String[] r:recipes.influencerRecipes(id)){Recipe recipe=recipes.get(Integer.parseInt(r[0]));if(recipe!=null){b.append(recipeCard(recipe,u));if(u!=null&&(u.isAdmin()||u.getId()==id))b.append("<div class='card'><a class='btn secondary small' href='/?page=editrecipe&id=").append(recipe.getId()).append("'>Edit recipe</a><form method='post' class='inline'><input type='hidden' name='action' value='deleteRecipe'><input type='hidden' name='id' value='").append(recipe.getId()).append("'><button class='linkbtn'>Delete recipe</button></form></div>");}}b.append("</div>");}
-    private static void renderRecipe(StringBuilder b,User u,int id)throws Exception{Recipe r=recipes.get(id);if(r==null){b.append(empty("Recipe not found","Try browsing the recipe book."));return;}b.append("<section class='recipehero card'><div class='foodemoji'>🍲</div><div><div class='eyebrow'>").append(esc(r.getCategory())).append(" · BY ").append(esc(r.getCreator().toUpperCase())).append("</div><h1>").append(esc(r.getTitle())).append("</h1><p>").append(esc(r.getDescription())).append("</p><div class='rating'>").append(r.getAverageRating()==null?"Not rated yet":"★ "+String.format(Locale.US,"%.1f",r.getAverageRating())+" / 5").append(" <span class='muted'>· Creator score ").append(String.format(Locale.US,"%.1f",r.getInfluencerScore())).append("/5</span></div><div class='tags'>").append(tags(r.getTags())).append("</div></div></section><div class='grid two detailgrid'><section class='card'><h2>Ingredients</h2><ul class='ingredientlist'>");Map<String,Double> stock=u==null?Map.of():recipes.pantry(u);for(String[] x:recipes.ingredients(id)){double need=Double.parseDouble(x[1]),have=stock.getOrDefault(x[0].toLowerCase(Locale.ROOT),0.0);b.append("<li><span>").append(esc(x[0])).append(" <small class='muted'>").append(fmt(need)).append(" ").append(esc(x[2])).append("</small></span><span class='pill ").append(u==null?"":have>=need?"good":"missing").append("'>").append(u==null?"Sign in to match":have>=need?"In pantry":"Need "+fmt(need-have)+" "+esc(x[2])).append("</span></li>");}b.append("</ul>");if(u!=null)b.append("<form method='post' class='inlineform'><input type='hidden' name='action' value='addMeal'><input type='hidden' name='recipeId' value='").append(id).append("'><input type='date' name='date' required><select name='mealType'><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select><button class='btn small'>Add to meal plan</button></form>");b.append("</section><section class='card'><h2>How to make it</h2><div class='instructions'>").append(esc(r.getInstructions()).replace("\\n","<br>").replace("\n","<br>")).append("</div></section></div><section class='card reviews'><h2>Ratings & reviews</h2>");List<String[]> rev=recipes.reviews(id);if(rev.isEmpty())b.append("<p class='muted'>No reviews yet. Be the first to share feedback.</p>");for(String[] x:rev)b.append("<div class='review'><b>").append(esc(x[0])).append(" · ").append("★".repeat(Integer.parseInt(x[1]))).append("</b><p>").append(esc(x[2])).append("</p><small class='muted'>").append(esc(x[3])).append("</small></div>");if(u!=null&&!u.isAdmin()&&!u.isInfluencer())b.append("<form method='post' class='stack reviewform'><input type='hidden' name='action' value='review'><input type='hidden' name='recipeId' value='").append(id).append("'><label>Your rating<select name='rating'><option value='5'>★★★★★ — Loved it</option><option value='4'>★★★★ — Really good</option><option value='3'>★★★ — Good</option><option value='2'>★★ — Could improve</option><option value='1'>★ — Not for me</option></select></label><label>Your review<textarea name='reviewText' maxlength='1000' rows='3' placeholder='What did you think?'></textarea></label><button class='btn'>Submit review</button><small class='muted'>One review per recipe per account; submitting again updates it.</small></form>");else if(u==null)b.append("<p><a href='/?page=login'>Sign in</a> as a regular user to leave a review.</p>");b.append("</section>");}
-    private static void renderPlanner(StringBuilder b,User u)throws Exception{if(u==null){b.append(loginPrompt());return;}b.append("<section class='pagehead'><div><div class='eyebrow'>A LITTLE PLAN GOES A LONG WAY</div><h1>Meal planner</h1><p>Choose a recipe and make a plan for the week.</p></div></section><div class='grid two'><section class='card'><h2>Plan a meal</h2><form method='post' class='stack'><input type='hidden' name='action' value='addMeal'><label>Recipe<select name='recipeId'>");for(Recipe r:recipes.list("",""))b.append("<option value='").append(r.getId()).append("'>").append(esc(r.getTitle())).append("</option>");b.append("</select></label><label>Date<input type='date' name='date' required></label><label>Meal<select name='mealType'><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></label><button class='btn'>Add to plan</button></form></section><section class='card'><h2>Your upcoming meals</h2>");List<MealPlan> plans=meals.list(u);if(plans.isEmpty())b.append(empty("Nothing planned yet","Add a recipe and date to get started."));for(MealPlan p:plans)b.append("<div class='pantryrow'><div><b>").append(esc(p.getRecipeTitle())).append("</b><small>").append(esc(p.getDate())).append(" · ").append(esc(p.getMealType())).append("</small></div><form method='post'><input type='hidden' name='action' value='deleteMeal'><input type='hidden' name='id' value='").append(p.getId()).append("'><button class='iconbtn'>×</button></form></div>");b.append("</section></div>");}
-    private static void renderNewRecipe(StringBuilder b,User u){if(u==null||!(u.isInfluencer()||u.isAdmin())){b.append("<section class='card'>").append(loginPrompt()).append("<p>Publishing recipes requires an influencer or admin account.</p></section>");return;}b.append("<section class='pagehead'><div><div class='eyebrow'>SHARE YOUR SIGNATURE DISH</div><h1>Publish a recipe</h1><p>Ingredients format: Name,quantity,unit — one per line.</p></div></section><section class='card formcard'><form method='post' class='stack'><input type='hidden' name='action' value='addRecipe'><label>Recipe title<input name='title' required maxlength='100'></label><label>Short description<textarea name='description' required rows='2'></textarea></label><label>Cooking instructions<textarea name='instructions' required rows='5' placeholder='1. Prepare ingredients...'></textarea></label><div class='grid two'><label>Category<select name='category'><option>Healthy</option><option>Budget-Friendly</option><option>Quick Meals</option><option>Vegetarian</option><option>Dessert</option><option>Other</option></select></label><label>Tags<input name='tags' placeholder='Healthy,Quick Meals,Vegetarian'></label></div><label>Ingredients<textarea name='ingredients' rows='5' required placeholder='Tomato,100,g&#10;Olive oil,10,ml&#10;Pasta,100,g'></textarea></label><button class='btn'>Publish recipe</button></form></section>");}
-    private static void renderEditRecipe(StringBuilder b,User u,Map<String,String> q)throws Exception{if(u==null||!(u.isInfluencer()||u.isAdmin())){b.append(loginPrompt());return;}int id=Integer.parseInt(q.getOrDefault("id","0"));Recipe r=recipes.get(id);if(r==null){b.append(empty("Recipe not found","Return to the recipe book."));return;}StringBuilder ingredientText=new StringBuilder();for(String[] x:recipes.ingredients(id))ingredientText.append(x[0]).append(',').append(fmt(Double.parseDouble(x[1]))).append(',').append(x[2]).append('\n');b.append("<section class='pagehead'><div><div class='eyebrow'>RECIPE MANAGEMENT</div><h1>Edit recipe</h1></div></section><section class='card formcard'><form method='post' class='stack'><input type='hidden' name='action' value='updateRecipe'><input type='hidden' name='id' value='").append(id).append("'><label>Recipe title<input name='title' required maxlength='100' value='").append(esc(r.getTitle())).append("'></label><label>Description<textarea name='description' required rows='2'>").append(esc(r.getDescription())).append("</textarea></label><label>Instructions<textarea name='instructions' required rows='5'>").append(esc(r.getInstructions().replace("\\n","\n"))).append("</textarea></label><div class='grid two'><label>Category<input name='category' value='").append(esc(r.getCategory())).append("'></label><label>Tags<input name='tags' value='").append(esc(r.getTags())).append("'></label></div><label>Ingredients<textarea name='ingredients' rows='5' required>").append(esc(ingredientText.toString().trim())).append("</textarea></label><button class='btn'>Save changes</button></form></section>");}
-    private static void renderAdmin(StringBuilder b,User u)throws Exception{if(u==null||!u.isAdmin()){b.append("<section class='card'><h1>Admin area</h1><p>Admin access required.</p></section>");return;}b.append("<section class='pagehead'><div><div class='eyebrow'>SYSTEM MODERATION</div><h1>Admin console</h1><p>Manage accounts and remove inappropriate recipes.</p></div><a class='btn' href='/?page=newrecipe'>Add recipe</a></section><section class='card'><h2>Accounts</h2><div class='itemlist'>");try(Connection c=DatabaseConnection.getConnection();PreparedStatement p=c.prepareStatement("SELECT id,username,role FROM users ORDER BY role,username");ResultSet r=p.executeQuery()){while(r.next()){b.append("<div class='pantryrow'><div><b>").append(esc(r.getString(2))).append("</b><small>").append(esc(r.getString(3))).append(" · account #").append(r.getInt(1)).append("</small></div>");if(r.getString(2).equals("admin"))b.append("<span class='pill'>Protected</span>");else b.append("<form method='post' onsubmit=\"return confirm('Remove this account?')\"><input type='hidden' name='action' value='moderateUser'><input type='hidden' name='id' value='").append(r.getInt(1)).append("'><button class='iconbtn'>×</button></form>");b.append("</div>");}}b.append("</div></section><section class='card'><h2>All recipes</h2><div class='itemlist'>");for(Recipe r:recipes.list("",""))b.append("<div class='pantryrow'><div><b><a href='/?page=recipe&id=").append(r.getId()).append("'>").append(esc(r.getTitle())).append("</a></b><small>by ").append(esc(r.getCreator())).append("</small></div><a class='btn secondary small' href='/?page=editrecipe&id=").append(r.getId()).append("'>Edit</a><form method='post'><input type='hidden' name='action' value='deleteRecipe'><input type='hidden' name='id' value='").append(r.getId()).append("'><button class='iconbtn'>×</button></form></div>");b.append("</div></section>");}
-    private static String recommendationNote(Recipe r,User u)throws Exception{if(u==null)return "";Map<String,Double> stock=recipes.pantry(u);double total=0,covered=0;List<String> missing=new ArrayList<>();for(String[] x:recipes.ingredients(r.getId())){double need=Double.parseDouble(x[1]),have=stock.getOrDefault(x[0].toLowerCase(Locale.ROOT),0.0);total+=need;covered+=Math.min(need,have);if(have+1e-9<need)missing.add(x[0]+" (need "+fmt(need-have)+" "+x[2]+")");}double pct=total==0?0:covered*100/total;String why=missing.isEmpty()?"You have all listed ingredients.":"Missing: "+String.join(", ",missing);return "<div class='recnote'><b>Why this match?</b><br>Pantry match: "+String.format(Locale.US,"%.0f",pct)+"% · "+esc(why)+"</div>";}
-    private static String tags(String s){if(s==null||s.isBlank())return "";StringBuilder b=new StringBuilder();for(String x:s.split(","))if(!x.isBlank())b.append("<span class='tag'>").append(esc(x.trim())).append("</span>");return b.toString();}
-    private static String empty(String title,String desc){return "<div class='empty'><span>☘</span><b>"+esc(title)+"</b><p>"+esc(desc)+"</p></div>";}
-    private static String loginPrompt(){return "<div class='empty'><span>♧</span><b>Sign in to continue</b><p>This area is personal to your account.</p><a class='btn' href='/?page=login'>Sign in</a></div>";}
-    private static String fmt(double x){return x==Math.rint(x)?Long.toString((long)x):String.format(Locale.US,"%.1f",x);}
-    private static String esc(String s){if(s==null)return "";return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;").replace("'","&#39;");}
-    private static Map<String,String> parseQuery(URI uri){Map<String,String> m=new HashMap<>();String q=uri.getRawQuery();if(q!=null)for(String pair:q.split("&")){String[] p=pair.split("=",2);m.put(URLDecoder.decode(p[0],StandardCharsets.UTF_8),p.length>1?URLDecoder.decode(p[1],StandardCharsets.UTF_8):"");}return m;}
-    private static void send(HttpExchange ex,int status,String html)throws IOException{byte[] bytes=html.getBytes(StandardCharsets.UTF_8);ex.getResponseHeaders().set("Content-Type","text/html; charset=UTF-8");ex.getResponseHeaders().set("X-Content-Type-Options","nosniff");ex.getResponseHeaders().set("Content-Security-Policy","default-src 'self' 'unsafe-inline'; img-src 'self' data:");ex.sendResponseHeaders(status,bytes.length);try(OutputStream out=ex.getResponseBody()){out.write(bytes);}}
+
+    private static void renderAuth(StringBuilder b, String page) {
+        boolean login = page.equals("login");
+        b.append("<section class='auth card'><div class='eyebrow'>YOUR KITCHEN, ORGANIZED</div><h1>")
+                .append(login ? "Welcome back" : "Create your account")
+                .append("</h1><p class='muted'>Discover recipes, plan meals and make the most of every ingredient.</p><form method='post' class='stack'><input type='hidden' name='action' value='")
+                .append(login ? "login" : "register")
+                .append("'><label>Username<input name='username' minlength='3' maxlength='24' required autocomplete='username'></label><label>Password<input type='password' name='password' minlength='8' required autocomplete='current-password'></label>");
+        if (!login)
+            b.append(
+                    "<label>Account type<select name='role'><option value='USER'>Regular user</option><option value='INFLUENCER'>Influencer / food creator</option></select></label>");
+        b.append("<button class='btn'>").append(login ? "Sign in" : "Create account").append("</button></form><p>")
+                .append(login ? "New here? <a href='/?page=register'>Create an account</a>"
+                        : "Already registered? <a href='/?page=login'>Sign in</a>")
+                .append("</p><p class='muted tiny'>Demo: admin / Admin@12345 · maya / Maya@12345 · demo / Demo@12345</p></section>");
+    }
+
+    private static void renderHome(StringBuilder b, User u) throws Exception {
+        b.append(
+                "<section class='hero'><div class='herotext'><div class='eyebrow'>A FRESH TAKE ON HOME COOKING</div><h1>Make something<br><em>delicious today.</em></h1><p>Plan smarter, use what you have, and find your next favourite recipe.</p><form action='/' class='search'><input type='hidden' name='page' value='recipes'><input name='q' placeholder='Search recipes or ingredients...'><button class='btn'>Find recipes ↗</button></form><div class='herofoot'><span>✦ Less food waste</span><span>✦ Everyday inspiration</span><span>✦ Your kitchen, your way</span></div></div><div class='heroart'><div class='circle'></div><div class='foodbig'>🥑</div><div class='floatcard one'>✿ <span>fresh ideas</span></div><div class='floatcard two'>♡ <span>made at home</span></div></div></section>");
+        if (u != null) {
+            b.append(
+                    "<section class='section'><div class='sectionhead'><div><div class='eyebrow'>BASED ON YOUR PANTRY</div><h2>Recommended for you</h2><p class='muted'>50% pantry match · 20% community rating · 30% creator score</p></div><a href='/?page=recipes'>Browse all →</a></div><div class='grid cards'>");
+            List<Recipe> rec = recipes.recommendations(u);
+            for (int i = 0; i < Math.min(3, rec.size()); i++) {
+                Recipe r = rec.get(i);
+                b.append(recipeCard(r, u)).append(recommendationNote(r, u));
+            }
+            if (rec.isEmpty())
+                b.append(empty("No recommendations yet", "Add pantry ingredients to get matched recipes."));
+            b.append("</div></section>");
+        }
+        b.append(
+                "<section class='section'><div class='sectionhead'><div><div class='eyebrow'>A LITTLE INSPIRATION</div><h2>Recipes to fall for</h2></div><a href='/?page=recipes'>See all recipes →</a></div><div class='grid cards'>");
+        for (Recipe r : recipes.list("", "").stream().limit(4).toList())
+            b.append(recipeCard(r, u));
+        b.append(
+                "</div></section><section class='banner'><div><div class='eyebrow'>MEET YOUR NEXT FOOD FAVOURITE</div><h2>Good things are growing.</h2><p>Find creators, learn their tricks and cook something lovely.</p></div><a class='btn' href='/?page=influencers'>Discover influencers →</a></section>");
+    }
+
+    private static void renderRecipes(StringBuilder b, User u, String search, String tag) throws Exception {
+        b.append(
+                "<section class='pagehead'><div><div class='eyebrow'>YOUR NEXT FAVOURITE</div><h1>Recipe book</h1><p>Search by recipe name or ingredient, then explore by tag.</p></div></section><form class='search' action='/'><input type='hidden' name='page' value='recipes'><input name='q' value='")
+                .append(esc(search))
+                .append("' placeholder='Recipe name or ingredient'><select name='tag'><option value=''>All tags</option>");
+        for (String t : List.of("Healthy", "Budget-Friendly", "Quick Meals", "Vegetarian"))
+            b.append("<option ").append(t.equals(tag) ? "selected" : "").append(">").append(t).append("</option>");
+        b.append("</select><button class='btn'>Search</button></form><div class='grid cards section'>");
+        List<Recipe> all = recipes.list(search, tag);
+        if (all.isEmpty())
+            b.append(empty("No recipes found", "Try another name, ingredient or tag."));
+        for (Recipe r : all)
+            b.append(recipeCard(r, u));
+        b.append("</div>");
+    }
+
+    private static String recipeCard(Recipe r, User u) {
+        String emoji = r.getCategory().toLowerCase().contains("healthy") ? "🥗"
+                : r.getCategory().toLowerCase().contains("budget") ? "🥔"
+                        : r.getCategory().toLowerCase().contains("quick") ? "🍝" : "🍲";
+        return "<article class='card recipe-card'><a class='foodthumb' href='/?page=recipe&id=" + r.getId() + "'><span>"
+                + emoji + "</span><small>" + esc(r.getCategory())
+                + "</small></a><div class='recipebody'><div class='tags'>" + tags(r.getTags())
+                + "</div><h3><a href='/?page=recipe&id=" + r.getId() + "'>" + esc(r.getTitle())
+                + "</a></h3><p class='muted tiny'>By " + esc(r.getCreator())
+                + "</p><div class='cardfoot'><span class='rating'>"
+                + (r.getAverageRating() == null ? "Not rated yet"
+                        : "★ " + String.format(Locale.US, "%.1f", r.getAverageRating()) + " / 5")
+                + "</span><a class='arrow' href='/?page=recipe&id=" + r.getId() + "'>↗</a></div></div></article>";
+    }
+
+    private static void renderPantry(StringBuilder b, User u) throws Exception {
+        if (u == null) {
+            b.append(loginPrompt());
+            return;
+        }
+        b.append(
+                "<section class='pagehead'><div><div class='eyebrow'>YOUR KITCHEN INVENTORY</div><h1>My pantry</h1><p>Know what you have. Waste less. Cook more.</p></div></section><div class='grid two'><section class='card'><h2>Add or update an item</h2><form method='post' class='stack'><input type='hidden' name='action' value='addPantry'><label>Ingredient name<input name='name' placeholder='e.g. Tomatoes' required maxlength='80'></label><div class='grid two'><label>Quantity<input type='number' name='quantity' min='0' step='.1' required></label><label>Unit<select name='unit'><option>g</option><option>kg</option><option>ml</option><option>l</option><option>unit</option><option>tbsp</option><option>tsp</option></select></label></div><label>Expiry date (optional)<input type='date' name='expiry'></label><button class='btn'>Save pantry item</button><p class='tiny muted'>Saving an existing ingredient updates its quantity.</p></form></section><section class='card'><h2>What you have</h2>");
+        List<PantryItem> items = pantry.list(u);
+        if (items.isEmpty())
+            b.append(empty("Your pantry is empty", "Add your first ingredient to start matching recipes."));
+        else
+            for (PantryItem x : items)
+                b.append("<div class='pantryrow'><div><b>").append(esc(x.getName())).append("</b><small>")
+                        .append(fmt(x.getQuantity())).append(" ").append(esc(x.getUnit()))
+                        .append(x.getExpiryDate().isBlank() ? "" : " · Best before " + esc(x.getExpiryDate()))
+                        .append("</small></div><form method='post'><input type='hidden' name='action' value='deletePantry'><input type='hidden' name='id' value='")
+                        .append(x.getId())
+                        .append("'><button class='iconbtn' title='Delete item'>×</button></form></div>");
+        b.append("</section></div>");
+    }
+
+    private static void renderInfluencers(StringBuilder b) throws Exception {
+        b.append(
+                "<section class='pagehead'><div><div class='eyebrow'>MEET THE CREATORS</div><h1>Inspiration from real kitchens</h1><p>Discover food creators and the recipes they love to share.</p></div></section><div class='grid cards'>");
+        for (String[] x : recipes.influencers())
+            b.append("<article class='card creator'><div class='avatar'>")
+                    .append(esc(x[1].substring(0, 1).toUpperCase())).append("</div><div class='eyebrow'>")
+                    .append(esc(x[3])).append("</div><h2>").append(esc(x[1])).append("</h2><p>").append(esc(x[2]))
+                    .append("</p><div class='muted tiny'>").append(x[4]).append(" recipes · ")
+                    .append(x[5] == null ? "No ratings yet"
+                            : "★ " + String.format(Locale.US, "%.1f", Double.parseDouble(x[5])))
+                    .append("</div><a class='btn secondary' href='/?page=creator&id=").append(x[0])
+                    .append("'>View profile</a></article>");
+        b.append("</div>");
+    }
+
+    private static void renderCreator(StringBuilder b, Map<String, String> q, User u) throws Exception {
+        int id = Integer.parseInt(q.getOrDefault("id", "0"));
+        String[] chosen = null;
+        for (String[] x : recipes.influencers())
+            if (Integer.parseInt(x[0]) == id)
+                chosen = x;
+        if (chosen == null) {
+            b.append(empty("Creator not found", "Browse all influencers to find a profile."));
+            return;
+        }
+        b.append("<section class='pagehead'><div class='avatar large'>")
+                .append(esc(chosen[1].substring(0, 1).toUpperCase()))
+                .append("</div><div><div class='eyebrow'>FOOD CREATOR</div><h1>").append(esc(chosen[1]))
+                .append("</h1><p>").append(esc(chosen[2])).append("</p><span class='pill'>").append(esc(chosen[3]))
+                .append("</span></div></section><h2>Recipes by ").append(esc(chosen[1]))
+                .append("</h2><div class='grid cards'>");
+        for (String[] r : recipes.influencerRecipes(id)) {
+            Recipe recipe = recipes.get(Integer.parseInt(r[0]));
+            if (recipe != null) {
+                b.append(recipeCard(recipe, u));
+                if (u != null && (u.isAdmin() || u.getId() == id))
+                    b.append("<div class='card'><a class='btn secondary small' href='/?page=editrecipe&id=")
+                            .append(recipe.getId())
+                            .append("'>Edit recipe</a><form method='post' class='inline'><input type='hidden' name='action' value='deleteRecipe'><input type='hidden' name='id' value='")
+                            .append(recipe.getId())
+                            .append("'><button class='linkbtn'>Delete recipe</button></form></div>");
+            }
+        }
+        b.append("</div>");
+    }
+
+    private static void renderRecipe(StringBuilder b, User u, int id) throws Exception {
+        Recipe r = recipes.get(id);
+        if (r == null) {
+            b.append(empty("Recipe not found", "Try browsing the recipe book."));
+            return;
+        }
+        b.append("<section class='recipehero card'><div class='foodemoji'>🍲</div><div><div class='eyebrow'>")
+                .append(esc(r.getCategory())).append(" · BY ").append(esc(r.getCreator().toUpperCase()))
+                .append("</div><h1>").append(esc(r.getTitle())).append("</h1><p>").append(esc(r.getDescription()))
+                .append("</p><div class='rating'>")
+                .append(r.getAverageRating() == null ? "Not rated yet"
+                        : "★ " + String.format(Locale.US, "%.1f", r.getAverageRating()) + " / 5")
+                .append(" <span class='muted'>· Creator score ")
+                .append(String.format(Locale.US, "%.1f", r.getInfluencerScore()))
+                .append("/5</span></div><div class='tags'>").append(tags(r.getTags()))
+                .append("</div></div></section><div class='grid two detailgrid'><section class='card'><h2>Ingredients</h2><ul class='ingredientlist'>");
+        Map<String, Double> stock = u == null ? Map.of() : recipes.pantry(u);
+        for (String[] x : recipes.ingredients(id)) {
+            double need = Double.parseDouble(x[1]), have = stock.getOrDefault(x[0].toLowerCase(Locale.ROOT), 0.0);
+            b.append("<li><span>").append(esc(x[0])).append(" <small class='muted'>").append(fmt(need)).append(" ")
+                    .append(esc(x[2])).append("</small></span><span class='pill ")
+                    .append(u == null ? "" : have >= need ? "good" : "missing").append("'>")
+                    .append(u == null ? "Sign in to match"
+                            : have >= need ? "In pantry" : "Need " + fmt(need - have) + " " + esc(x[2]))
+                    .append("</span></li>");
+        }
+        b.append("</ul>");
+        if (u != null)
+            b.append(
+                    "<form method='post' class='inlineform'><input type='hidden' name='action' value='addMeal'><input type='hidden' name='recipeId' value='")
+                    .append(id)
+                    .append("'><input type='date' name='date' required><select name='mealType'><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select><button class='btn small'>Add to meal plan</button></form>");
+        b.append("</section><section class='card'><h2>How to make it</h2><div class='instructions'>")
+                .append(esc(r.getInstructions()).replace("\\n", "<br>").replace("\n", "<br>"))
+                .append("</div></section></div><section class='card reviews'><h2>Ratings & reviews</h2>");
+        List<String[]> rev = recipes.reviews(id);
+        if (rev.isEmpty())
+            b.append("<p class='muted'>No reviews yet. Be the first to share feedback.</p>");
+        for (String[] x : rev)
+            b.append("<div class='review'><b>").append(esc(x[0])).append(" · ")
+                    .append("★".repeat(Integer.parseInt(x[1]))).append("</b><p>").append(esc(x[2]))
+                    .append("</p><small class='muted'>").append(esc(x[3])).append("</small></div>");
+        if (u != null && !u.isAdmin() && !u.isInfluencer())
+            b.append(
+                    "<form method='post' class='stack reviewform'><input type='hidden' name='action' value='review'><input type='hidden' name='recipeId' value='")
+                    .append(id)
+                    .append("'><label>Your rating<select name='rating'><option value='5'>★★★★★ — Loved it</option><option value='4'>★★★★ — Really good</option><option value='3'>★★★ — Good</option><option value='2'>★★ — Could improve</option><option value='1'>★ — Not for me</option></select></label><label>Your review<textarea name='reviewText' maxlength='1000' rows='3' placeholder='What did you think?'></textarea></label><button class='btn'>Submit review</button><small class='muted'>One review per recipe per account; submitting again updates it.</small></form>");
+        else if (u == null)
+            b.append("<p><a href='/?page=login'>Sign in</a> as a regular user to leave a review.</p>");
+        b.append("</section>");
+    }
+
+    private static void renderPlanner(StringBuilder b, User u) throws Exception {
+        if (u == null) {
+            b.append(loginPrompt());
+            return;
+        }
+        b.append(
+                "<section class='pagehead'><div><div class='eyebrow'>A LITTLE PLAN GOES A LONG WAY</div><h1>Meal planner</h1><p>Choose a recipe and make a plan for the week.</p></div></section><div class='grid two'><section class='card'><h2>Plan a meal</h2><form method='post' class='stack'><input type='hidden' name='action' value='addMeal'><label>Recipe<select name='recipeId'>");
+        for (Recipe r : recipes.list("", ""))
+            b.append("<option value='").append(r.getId()).append("'>").append(esc(r.getTitle())).append("</option>");
+        b.append(
+                "</select></label><label>Date<input type='date' name='date' required></label><label>Meal<select name='mealType'><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></label><button class='btn'>Add to plan</button></form></section><section class='card'><h2>Your upcoming meals</h2>");
+        List<MealPlan> plans = meals.list(u);
+        if (plans.isEmpty())
+            b.append(empty("Nothing planned yet", "Add a recipe and date to get started."));
+        for (MealPlan p : plans)
+            b.append("<div class='pantryrow'><div><b>").append(esc(p.getRecipeTitle())).append("</b><small>")
+                    .append(esc(p.getDate())).append(" · ").append(esc(p.getMealType()))
+                    .append("</small></div><form method='post'><input type='hidden' name='action' value='deleteMeal'><input type='hidden' name='id' value='")
+                    .append(p.getId()).append("'><button class='iconbtn'>×</button></form></div>");
+        b.append("</section></div>");
+    }
+
+    private static void renderNewRecipe(StringBuilder b, User u) {
+        if (u == null || !(u.isInfluencer() || u.isAdmin())) {
+            b.append("<section class='card'>").append(loginPrompt())
+                    .append("<p>Publishing recipes requires an influencer or admin account.</p></section>");
+            return;
+        }
+        b.append(
+                "<section class='pagehead'><div><div class='eyebrow'>SHARE YOUR SIGNATURE DISH</div><h1>Publish a recipe</h1><p>Ingredients format: Name,quantity,unit — one per line.</p></div></section><section class='card formcard'><form method='post' class='stack'><input type='hidden' name='action' value='addRecipe'><label>Recipe title<input name='title' required maxlength='100'></label><label>Short description<textarea name='description' required rows='2'></textarea></label><label>Cooking instructions<textarea name='instructions' required rows='5' placeholder='1. Prepare ingredients...'></textarea></label><div class='grid two'><label>Category<select name='category'><option>Healthy</option><option>Budget-Friendly</option><option>Quick Meals</option><option>Vegetarian</option><option>Dessert</option><option>Other</option></select></label><label>Tags<input name='tags' placeholder='Healthy,Quick Meals,Vegetarian'></label></div><label>Ingredients<textarea name='ingredients' rows='5' required placeholder='Tomato,100,g&#10;Olive oil,10,ml&#10;Pasta,100,g'></textarea></label><button class='btn'>Publish recipe</button></form></section>");
+    }
+
+    private static void renderEditRecipe(StringBuilder b, User u, Map<String, String> q) throws Exception {
+        if (u == null || !(u.isInfluencer() || u.isAdmin())) {
+            b.append(loginPrompt());
+            return;
+        }
+        int id = Integer.parseInt(q.getOrDefault("id", "0"));
+        Recipe r = recipes.get(id);
+        if (r == null) {
+            b.append(empty("Recipe not found", "Return to the recipe book."));
+            return;
+        }
+        StringBuilder ingredientText = new StringBuilder();
+        for (String[] x : recipes.ingredients(id))
+            ingredientText.append(x[0]).append(',').append(fmt(Double.parseDouble(x[1]))).append(',').append(x[2])
+                    .append('\n');
+        b.append(
+                "<section class='pagehead'><div><div class='eyebrow'>RECIPE MANAGEMENT</div><h1>Edit recipe</h1></div></section><section class='card formcard'><form method='post' class='stack'><input type='hidden' name='action' value='updateRecipe'><input type='hidden' name='id' value='")
+                .append(id).append("'><label>Recipe title<input name='title' required maxlength='100' value='")
+                .append(esc(r.getTitle()))
+                .append("'></label><label>Description<textarea name='description' required rows='2'>")
+                .append(esc(r.getDescription()))
+                .append("</textarea></label><label>Instructions<textarea name='instructions' required rows='5'>")
+                .append(esc(r.getInstructions().replace("\\n", "\n")))
+                .append("</textarea></label><div class='grid two'><label>Category<input name='category' value='")
+                .append(esc(r.getCategory())).append("'></label><label>Tags<input name='tags' value='")
+                .append(esc(r.getTags()))
+                .append("'></label></div><label>Ingredients<textarea name='ingredients' rows='5' required>")
+                .append(esc(ingredientText.toString().trim()))
+                .append("</textarea></label><button class='btn'>Save changes</button></form></section>");
+    }
+
+    private static void renderAdmin(StringBuilder b, User u) throws Exception {
+        if (u == null || !u.isAdmin()) {
+            b.append("<section class='card'><h1>Admin area</h1><p>Admin access required.</p></section>");
+            return;
+        }
+        b.append(
+                "<section class='pagehead'><div><div class='eyebrow'>SYSTEM MODERATION</div><h1>Admin console</h1><p>Manage accounts and remove inappropriate recipes.</p></div><a class='btn' href='/?page=newrecipe'>Add recipe</a></section><section class='card'><h2>Accounts</h2><div class='itemlist'>");
+        try (Connection c = DatabaseConnection.getConnection();
+                PreparedStatement p = c.prepareStatement("SELECT id,username,role FROM users ORDER BY role,username");
+                ResultSet r = p.executeQuery()) {
+            while (r.next()) {
+                b.append("<div class='pantryrow'><div><b>").append(esc(r.getString(2))).append("</b><small>")
+                        .append(esc(r.getString(3))).append(" · account #").append(r.getInt(1))
+                        .append("</small></div>");
+                if (r.getString(2).equals("admin"))
+                    b.append("<span class='pill'>Protected</span>");
+                else
+                    b.append(
+                            "<form method='post' onsubmit=\"return confirm('Remove this account?')\"><input type='hidden' name='action' value='moderateUser'><input type='hidden' name='id' value='")
+                            .append(r.getInt(1)).append("'><button class='iconbtn'>×</button></form>");
+                b.append("</div>");
+            }
+        }
+        b.append("</div></section><section class='card'><h2>All recipes</h2><div class='itemlist'>");
+        for (Recipe r : recipes.list("", ""))
+            b.append("<div class='pantryrow'><div><b><a href='/?page=recipe&id=").append(r.getId()).append("'>")
+                    .append(esc(r.getTitle())).append("</a></b><small>by ").append(esc(r.getCreator()))
+                    .append("</small></div><a class='btn secondary small' href='/?page=editrecipe&id=")
+                    .append(r.getId())
+                    .append("'>Edit</a><form method='post'><input type='hidden' name='action' value='deleteRecipe'><input type='hidden' name='id' value='")
+                    .append(r.getId()).append("'><button class='iconbtn'>×</button></form></div>");
+        b.append("</div></section>");
+    }
+
+    private static String recommendationNote(Recipe r, User u) throws Exception {
+        if (u == null)
+            return "";
+        Map<String, Double> stock = recipes.pantry(u);
+        double total = 0, covered = 0;
+        List<String> missing = new ArrayList<>();
+        for (String[] x : recipes.ingredients(r.getId())) {
+            double need = Double.parseDouble(x[1]), have = stock.getOrDefault(x[0].toLowerCase(Locale.ROOT), 0.0);
+            total += need;
+            covered += Math.min(need, have);
+            if (have + 1e-9 < need)
+                missing.add(x[0] + " (need " + fmt(need - have) + " " + x[2] + ")");
+        }
+        double pct = total == 0 ? 0 : covered * 100 / total;
+        String why = missing.isEmpty() ? "You have all listed ingredients." : "Missing: " + String.join(", ", missing);
+        return "<div class='recnote'><b>Why this match?</b><br>Pantry match: " + String.format(Locale.US, "%.0f", pct)
+                + "% · " + esc(why) + "</div>";
+    }
+
+    private static String tags(String s) {
+        if (s == null || s.isBlank())
+            return "";
+        StringBuilder b = new StringBuilder();
+        for (String x : s.split(","))
+            if (!x.isBlank())
+                b.append("<span class='tag'>").append(esc(x.trim())).append("</span>");
+        return b.toString();
+    }
+
+    private static String empty(String title, String desc) {
+        return "<div class='empty'><span>☘</span><b>" + esc(title) + "</b><p>" + esc(desc) + "</p></div>";
+    }
+
+    private static String loginPrompt() {
+        return "<div class='empty'><span>♧</span><b>Sign in to continue</b><p>This area is personal to your account.</p><a class='btn' href='/?page=login'>Sign in</a></div>";
+    }
+
+    private static String fmt(double x) {
+        return x == Math.rint(x) ? Long.toString((long) x) : String.format(Locale.US, "%.1f", x);
+    }
+
+    private static String esc(String s) {
+        if (s == null)
+            return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'",
+                "&#39;");
+    }
+
+    private static Map<String, String> parseQuery(URI uri) {
+        Map<String, String> m = new HashMap<>();
+        String q = uri.getRawQuery();
+        if (q != null)
+            for (String pair : q.split("&")) {
+                String[] p = pair.split("=", 2);
+                m.put(URLDecoder.decode(p[0], StandardCharsets.UTF_8),
+                        p.length > 1 ? URLDecoder.decode(p[1], StandardCharsets.UTF_8) : "");
+            }
+        return m;
+    }
+
+    private static void send(HttpExchange ex, int status, String html) throws IOException {
+        byte[] bytes = html.getBytes(StandardCharsets.UTF_8);
+        ex.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+        ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        ex.getResponseHeaders().set("Content-Security-Policy",
+                "default-src 'self' 'unsafe-inline'; img-src 'self' data:");
+        ex.sendResponseHeaders(status, bytes.length);
+        try (OutputStream out = ex.getResponseBody()) {
+            out.write(bytes);
+        }
+    }
+
     private static final String CSS = """
-        :root{--cream:#fbf7ef;--paper:#fffdf8;--sage:#71866a;--sage-dark:#40553e;--sage-pale:#e7ecdf;--terra:#c66f50;--ink:#263329;--muted:#7b8278;--line:#e9e4d8;--shadow:0 14px 40px #3b493312}*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font-family:Inter,'Segoe UI',Arial,sans-serif;line-height:1.55}a{color:var(--sage-dark);text-decoration:none}a:hover{color:var(--terra)}.top{display:flex;align-items:center;justify-content:space-between;gap:25px;padding:18px 5.5%;background:#fbf7eff0;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;backdrop-filter:blur(12px)}.brand{display:flex;align-items:center;gap:10px;font-family:Georgia,serif;font-size:23px;font-weight:bold;color:var(--sage-dark);line-height:1}.brand i{color:var(--terra);font-weight:normal}.brand small{display:block;font:9px Arial,sans-serif;letter-spacing:2px;color:var(--muted);margin-top:6px}.logo{font-size:34px;color:var(--terra)}nav{display:flex;gap:24px;font-size:13px;font-weight:600}nav a{color:#586455}.account{display:flex;align-items:center;gap:12px;font-size:12px}.hello{color:var(--muted)}main{max-width:1200px;margin:auto;padding:32px 5.5% 70px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:9px;padding:12px 18px;background:var(--sage-dark);color:white;font-size:13px;font-weight:700;cursor:pointer;transition:.2s}.btn:hover{background:#2f422e;color:white;transform:translateY(-1px)}.btn.secondary{background:var(--sage-pale);color:var(--sage-dark)}.btn.small{padding:8px 12px;font-size:12px}.linkbtn{border:0;background:none;color:var(--terra);cursor:pointer;font-weight:700}.inline{display:inline}.notice{padding:13px 17px;margin-bottom:22px;border-radius:10px;background:var(--sage-pale);color:var(--sage-dark);border:1px solid #d5dfcc;font-size:14px}.hero{display:grid;grid-template-columns:1.05fr .95fr;align-items:center;min-height:390px;background:#f2eee3;border-radius:24px;overflow:hidden;padding:48px 6%;position:relative}.eyebrow{font-size:10px;letter-spacing:2.2px;color:var(--terra);font-weight:800;text-transform:uppercase}.hero h1,.pagehead h1{font:normal clamp(38px,5vw,62px)/1.08 Georgia,serif;letter-spacing:-1.5px;margin:18px 0}.hero h1 em{color:var(--sage);font-weight:normal}.hero p,.pagehead p{color:#747a6f;max-width:510px}.search{display:flex;gap:5px;background:white;border:1px solid var(--line);padding:5px;border-radius:12px;max-width:650px;margin:18px 0 25px;box-shadow:0 8px 25px #2633290a}.search input{border:0;outline:0;min-width:0;flex:1;padding:12px;background:transparent}.herofoot{display:flex;gap:16px;flex-wrap:wrap;font-size:10px;color:var(--sage-dark);margin-top:22px}.heroart{height:290px;position:relative;display:grid;place-items:center}.circle{width:270px;height:270px;border-radius:50%;background:#dce4d0;position:absolute}.foodbig{position:relative;font-size:180px;filter:drop-shadow(0 18px 12px #53624720);transform:rotate(-12deg)}.floatcard{position:absolute;background:#fffdf8;padding:12px 15px;border-radius:12px;box-shadow:var(--shadow);font-size:20px;color:var(--terra)}.floatcard span{font-size:11px;color:var(--ink);margin-left:4px}.floatcard.one{top:30px;right:8px}.floatcard.two{bottom:25px;left:0}.section{margin-top:48px}.sectionhead{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:20px}.sectionhead h2,.card h2,.banner h2{font:normal 30px Georgia,serif;margin:5px 0}.sectionhead p{font-size:12px;margin:4px 0}.sectionhead>a{font-size:13px;font-weight:700}.grid{display:grid;gap:18px}.grid.cards{grid-template-columns:repeat(3,minmax(0,1fr))}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 5px 18px #26332906}.recipe-card{padding:0;overflow:hidden;transition:.2s}.recipe-card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}.foodthumb{height:150px;background:linear-gradient(135deg,#e4e9da,#f4e6d5);display:flex;align-items:center;justify-content:center;position:relative}.foodthumb span{font-size:70px;filter:drop-shadow(0 8px 5px #3b493314)}.foodthumb small{position:absolute;left:12px;top:12px;border-radius:20px;background:#fffdf0d9;padding:5px 9px;font-size:10px;color:var(--sage-dark)}.recipebody{padding:17px}.recnote{background:#f0eee4;border-radius:0 0 14px 14px;padding:11px 15px;font-size:11px;color:#6b7567;line-height:1.6}.recnote b{color:#40553e}.recipebody h3{font:normal 21px Georgia,serif;margin:10px 0 4px}.tags{display:flex;gap:5px;flex-wrap:wrap}.tag,.pill{font-size:10px;border-radius:30px;padding:4px 8px;background:var(--sage-pale);color:var(--sage-dark)}.tag{background:#f4eee2;color:#8b684f}.tiny{font-size:11px}.muted{color:var(--muted)}.cardfoot{display:flex;align-items:center;justify-content:space-between;margin-top:15px}.rating{font-size:12px;color:#b77b34;font-weight:700}.arrow{width:28px;height:28px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center}.banner{margin-top:52px;background:#e5eadc;border-radius:18px;padding:28px 35px;display:flex;justify-content:space-between;align-items:center;gap:20px}.banner h2{font-size:29px}.banner p{color:var(--muted);margin-bottom:0}.pagehead{display:flex;align-items:center;gap:22px;margin:20px 0 30px}.pagehead h1{font-size:44px;margin:8px 0}.pagehead p{margin:0}.creator{text-align:center}.avatar{width:70px;height:70px;border-radius:50%;display:grid;place-items:center;margin:0 auto 16px;background:#e4eadb;color:var(--sage-dark);font:32px Georgia,serif;border:5px solid white;box-shadow:0 0 0 1px var(--line)}.avatar.large{margin:0;width:100px;height:100px;font-size:42px;flex-shrink:0}.creator h2{font-size:24px}.creator p{font-size:13px;color:var(--muted)}.creator .btn{margin-top:18px}.auth{max-width:470px;margin:30px auto;padding:35px}.auth h1{font:40px Georgia,serif;margin:12px 0}.stack{display:flex;flex-direction:column;gap:14px}.stack label,form label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:#53604f}input,textarea,select{width:100%;border:1px solid #dedfd4;background:#fffefa;padding:11px 12px;border-radius:8px;color:var(--ink);font:13px Arial,sans-serif;outline-color:var(--sage)}textarea{resize:vertical}.auth>p{font-size:12px}.auth .btn,.formcard .btn{width:100%}.formcard{max-width:760px}.formcard .grid{gap:12px}.itemlist{display:flex;flex-direction:column}.pantryrow{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:13px 0;border-bottom:1px solid var(--line)}.pantryrow:last-child{border-bottom:0}.pantryrow b{font-size:13px}.pantryrow small{display:block;font-size:11px;color:var(--muted);margin-top:3px}.iconbtn{border:0;background:#f7e8e1;color:var(--terra);border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:19px}.empty{text-align:center;padding:28px 15px;color:var(--muted)}.empty>span{display:block;font-size:30px;color:var(--sage);margin-bottom:10px}.empty b{display:block;color:var(--ink)}.empty p{font-size:12px}.recipehero{display:flex;align-items:center;gap:28px;margin:10px 0 20px;background:#f1eee2}.foodemoji{font-size:100px;min-width:130px;text-align:center}.recipehero h1{font:42px Georgia,serif;margin:7px 0}.recipehero p{color:var(--muted)}.detailgrid{align-items:start}.ingredientlist{list-style:none;padding:0;margin:15px 0}.ingredientlist li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}.ingredientlist small{display:block}.pill.missing{background:#f9e4da;color:#a44e35}.pill.good{background:#e2edda;color:#456d3e}.instructions{line-height:2;font-size:14px}.inlineform{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.inlineform input{width:auto;flex:1;min-width:130px}.inlineform select{width:auto}.reviews{margin-top:20px}.review{padding:13px 0;border-bottom:1px solid var(--line);font-size:13px}.review p{margin:5px 0}.reviewform{margin-top:20px;max-width:600px}.fab{position:fixed;bottom:24px;right:25px;background:var(--terra);color:white;border-radius:40px;padding:14px 20px;box-shadow:var(--shadow);font-weight:700;font-size:13px}.fab:hover{color:white;background:#aa593e}footer{text-align:center;padding:32px 15px 40px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}footer .brand{justify-content:center;font-size:21px}footer p{margin:12px 0 5px}.formcard h2{margin-top:0}@media(max-width:900px){.top{flex-wrap:wrap;gap:15px}nav{order:3;width:100%;overflow-x:auto;gap:18px;padding-bottom:3px}.account{margin-left:auto}.hero{padding:32px 5%;grid-template-columns:1fr}.heroart{height:210px}.circle{width:190px;height:190px}.foodbig{font-size:130px}.grid.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){main{padding:20px 4% 50px}.top{padding:15px 4%}.brand{font-size:20px}nav{gap:15px}nav a{white-space:nowrap;font-size:12px}.hello{display:none}.hero{border-radius:16px}.hero h1{font-size:43px}.heroart{height:185px}.grid.cards,.grid.two{grid-template-columns:1fr}.sectionhead{align-items:start}.sectionhead h2{font-size:25px}.banner{align-items:start;flex-direction:column;padding:25px}.pagehead h1{font-size:35px}.recipehero{flex-direction:column;align-items:start;gap:5px}.foodemoji{font-size:65px;min-width:0}.recipehero h1{font-size:34px}.auth{padding:25px}.fab{right:12px;bottom:12px}.inlineform{align-items:stretch}.inlineform input,.inlineform select{width:100%}.avatar.large{width:72px;height:72px;font-size:30px}}
-        """;
+            :root{--cream:#fbf7ef;--paper:#fffdf8;--sage:#71866a;--sage-dark:#40553e;--sage-pale:#e7ecdf;--terra:#c66f50;--ink:#263329;--muted:#7b8278;--line:#e9e4d8;--shadow:0 14px 40px #3b493312}*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font-family:Inter,'Segoe UI',Arial,sans-serif;line-height:1.55}a{color:var(--sage-dark);text-decoration:none}a:hover{color:var(--terra)}.top{display:flex;align-items:center;justify-content:space-between;gap:25px;padding:18px 5.5%;background:#fbf7eff0;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;backdrop-filter:blur(12px)}.brand{display:flex;align-items:center;gap:10px;font-family:Georgia,serif;font-size:23px;font-weight:bold;color:var(--sage-dark);line-height:1}.brand i{color:var(--terra);font-weight:normal}.brand small{display:block;font:9px Arial,sans-serif;letter-spacing:2px;color:var(--muted);margin-top:6px}.logo{font-size:34px;color:var(--terra)}nav{display:flex;gap:24px;font-size:13px;font-weight:600}nav a{color:#586455}.account{display:flex;align-items:center;gap:12px;font-size:12px}.hello{color:var(--muted)}main{max-width:1200px;margin:auto;padding:32px 5.5% 70px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:9px;padding:12px 18px;background:var(--sage-dark);color:white;font-size:13px;font-weight:700;cursor:pointer;transition:.2s}.btn:hover{background:#2f422e;color:white;transform:translateY(-1px)}.btn.secondary{background:var(--sage-pale);color:var(--sage-dark)}.btn.small{padding:8px 12px;font-size:12px}.linkbtn{border:0;background:none;color:var(--terra);cursor:pointer;font-weight:700}.inline{display:inline}.notice{padding:13px 17px;margin-bottom:22px;border-radius:10px;background:var(--sage-pale);color:var(--sage-dark);border:1px solid #d5dfcc;font-size:14px}.hero{display:grid;grid-template-columns:1.05fr .95fr;align-items:center;min-height:390px;background:#f2eee3;border-radius:24px;overflow:hidden;padding:48px 6%;position:relative}.eyebrow{font-size:10px;letter-spacing:2.2px;color:var(--terra);font-weight:800;text-transform:uppercase}.hero h1,.pagehead h1{font:normal clamp(38px,5vw,62px)/1.08 Georgia,serif;letter-spacing:-1.5px;margin:18px 0}.hero h1 em{color:var(--sage);font-weight:normal}.hero p,.pagehead p{color:#747a6f;max-width:510px}.search{display:flex;gap:5px;background:white;border:1px solid var(--line);padding:5px;border-radius:12px;max-width:650px;margin:18px 0 25px;box-shadow:0 8px 25px #2633290a}.search input{border:0;outline:0;min-width:0;flex:1;padding:12px;background:transparent}.herofoot{display:flex;gap:16px;flex-wrap:wrap;font-size:10px;color:var(--sage-dark);margin-top:22px}.heroart{height:290px;position:relative;display:grid;place-items:center}.circle{width:270px;height:270px;border-radius:50%;background:#dce4d0;position:absolute}.foodbig{position:relative;font-size:180px;filter:drop-shadow(0 18px 12px #53624720);transform:rotate(-12deg)}.floatcard{position:absolute;background:#fffdf8;padding:12px 15px;border-radius:12px;box-shadow:var(--shadow);font-size:20px;color:var(--terra)}.floatcard span{font-size:11px;color:var(--ink);margin-left:4px}.floatcard.one{top:30px;right:8px}.floatcard.two{bottom:25px;left:0}.section{margin-top:48px}.sectionhead{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:20px}.sectionhead h2,.card h2,.banner h2{font:normal 30px Georgia,serif;margin:5px 0}.sectionhead p{font-size:12px;margin:4px 0}.sectionhead>a{font-size:13px;font-weight:700}.grid{display:grid;gap:18px}.grid.cards{grid-template-columns:repeat(3,minmax(0,1fr))}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 5px 18px #26332906}.recipe-card{padding:0;overflow:hidden;transition:.2s}.recipe-card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}.foodthumb{height:150px;background:linear-gradient(135deg,#e4e9da,#f4e6d5);display:flex;align-items:center;justify-content:center;position:relative}.foodthumb span{font-size:70px;filter:drop-shadow(0 8px 5px #3b493314)}.foodthumb small{position:absolute;left:12px;top:12px;border-radius:20px;background:#fffdf0d9;padding:5px 9px;font-size:10px;color:var(--sage-dark)}.recipebody{padding:17px}.recnote{background:#f0eee4;border-radius:0 0 14px 14px;padding:11px 15px;font-size:11px;color:#6b7567;line-height:1.6}.recnote b{color:#40553e}.recipebody h3{font:normal 21px Georgia,serif;margin:10px 0 4px}.tags{display:flex;gap:5px;flex-wrap:wrap}.tag,.pill{font-size:10px;border-radius:30px;padding:4px 8px;background:var(--sage-pale);color:var(--sage-dark)}.tag{background:#f4eee2;color:#8b684f}.tiny{font-size:11px}.muted{color:var(--muted)}.cardfoot{display:flex;align-items:center;justify-content:space-between;margin-top:15px}.rating{font-size:12px;color:#b77b34;font-weight:700}.arrow{width:28px;height:28px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center}.banner{margin-top:52px;background:#e5eadc;border-radius:18px;padding:28px 35px;display:flex;justify-content:space-between;align-items:center;gap:20px}.banner h2{font-size:29px}.banner p{color:var(--muted);margin-bottom:0}.pagehead{display:flex;align-items:center;gap:22px;margin:20px 0 30px}.pagehead h1{font-size:44px;margin:8px 0}.pagehead p{margin:0}.creator{text-align:center}.avatar{width:70px;height:70px;border-radius:50%;display:grid;place-items:center;margin:0 auto 16px;background:#e4eadb;color:var(--sage-dark);font:32px Georgia,serif;border:5px solid white;box-shadow:0 0 0 1px var(--line)}.avatar.large{margin:0;width:100px;height:100px;font-size:42px;flex-shrink:0}.creator h2{font-size:24px}.creator p{font-size:13px;color:var(--muted)}.creator .btn{margin-top:18px}.auth{max-width:470px;margin:30px auto;padding:35px}.auth h1{font:40px Georgia,serif;margin:12px 0}.stack{display:flex;flex-direction:column;gap:14px}.stack label,form label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:#53604f}input,textarea,select{width:100%;border:1px solid #dedfd4;background:#fffefa;padding:11px 12px;border-radius:8px;color:var(--ink);font:13px Arial,sans-serif;outline-color:var(--sage)}textarea{resize:vertical}.auth>p{font-size:12px}.auth .btn,.formcard .btn{width:100%}.formcard{max-width:760px}.formcard .grid{gap:12px}.itemlist{display:flex;flex-direction:column}.pantryrow{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:13px 0;border-bottom:1px solid var(--line)}.pantryrow:last-child{border-bottom:0}.pantryrow b{font-size:13px}.pantryrow small{display:block;font-size:11px;color:var(--muted);margin-top:3px}.iconbtn{border:0;background:#f7e8e1;color:var(--terra);border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:19px}.empty{text-align:center;padding:28px 15px;color:var(--muted)}.empty>span{display:block;font-size:30px;color:var(--sage);margin-bottom:10px}.empty b{display:block;color:var(--ink)}.empty p{font-size:12px}.recipehero{display:flex;align-items:center;gap:28px;margin:10px 0 20px;background:#f1eee2}.foodemoji{font-size:100px;min-width:130px;text-align:center}.recipehero h1{font:42px Georgia,serif;margin:7px 0}.recipehero p{color:var(--muted)}.detailgrid{align-items:start}.ingredientlist{list-style:none;padding:0;margin:15px 0}.ingredientlist li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}.ingredientlist small{display:block}.pill.missing{background:#f9e4da;color:#a44e35}.pill.good{background:#e2edda;color:#456d3e}.instructions{line-height:2;font-size:14px}.inlineform{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.inlineform input{width:auto;flex:1;min-width:130px}.inlineform select{width:auto}.reviews{margin-top:20px}.review{padding:13px 0;border-bottom:1px solid var(--line);font-size:13px}.review p{margin:5px 0}.reviewform{margin-top:20px;max-width:600px}.fab{position:fixed;bottom:24px;right:25px;background:var(--terra);color:white;border-radius:40px;padding:14px 20px;box-shadow:var(--shadow);font-weight:700;font-size:13px}.fab:hover{color:white;background:#aa593e}footer{text-align:center;padding:32px 15px 40px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}footer .brand{justify-content:center;font-size:21px}footer p{margin:12px 0 5px}.formcard h2{margin-top:0}@media(max-width:900px){.top{flex-wrap:wrap;gap:15px}nav{order:3;width:100%;overflow-x:auto;gap:18px;padding-bottom:3px}.account{margin-left:auto}.hero{padding:32px 5%;grid-template-columns:1fr}.heroart{height:210px}.circle{width:190px;height:190px}.foodbig{font-size:130px}.grid.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){main{padding:20px 4% 50px}.top{padding:15px 4%}.brand{font-size:20px}nav{gap:15px}nav a{white-space:nowrap;font-size:12px}.hello{display:none}.hero{border-radius:16px}.hero h1{font-size:43px}.heroart{height:185px}.grid.cards,.grid.two{grid-template-columns:1fr}.sectionhead{align-items:start}.sectionhead h2{font-size:25px}.banner{align-items:start;flex-direction:column;padding:25px}.pagehead h1{font-size:35px}.recipehero{flex-direction:column;align-items:start;gap:5px}.foodemoji{font-size:65px;min-width:0}.recipehero h1{font-size:34px}.auth{padding:25px}.fab{right:12px;bottom:12px}.inlineform{align-items:stretch}.inlineform input,.inlineform select{width:100%}.avatar.large{width:72px;height:72px;font-size:30px}}
+            """;
 }

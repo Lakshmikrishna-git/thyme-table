@@ -1,2 +1,34 @@
 package com.thymeandtable.model;
-public class MealPlan { private final int id,recipeId; private final String date,mealType,recipeTitle; public MealPlan(int id,int recipeId,String date,String mealType,String recipeTitle){this.id=id;this.recipeId=recipeId;this.date=date;this.mealType=mealType;this.recipeTitle=recipeTitle;} public int getId(){return id;} public int getRecipeId(){return recipeId;} public String getDate(){return date;} public String getMealType(){return mealType;} public String getRecipeTitle(){return recipeTitle;} }
+
+public class MealPlan {
+    private final int id, recipeId;
+    private final String date, mealType, recipeTitle;
+
+    public MealPlan(int id, int recipeId, String date, String mealType, String recipeTitle) {
+        this.id = id;
+        this.recipeId = recipeId;
+        this.date = date;
+        this.mealType = mealType;
+        this.recipeTitle = recipeTitle;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public int getRecipeId() {
+        return recipeId;
+    }
+
+    public String getDate() {
+        return date;
+    }
+
+    public String getMealType() {
+        return mealType;
+    }
+
+    public String getRecipeTitle() {
+        return recipeTitle;
+    }
+}
